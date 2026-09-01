@@ -123,7 +123,7 @@ Baseie as respostas APENAS no conteúdo fornecido acima.`
         },
         body: JSON.stringify({
           model: 'claude-opus-4-1',
-          max_tokens: 1024,
+          max_tokens: 2048,
           messages: [
             {
               role: 'user',
@@ -138,7 +138,20 @@ Baseie as respostas APENAS no conteúdo fornecido acima.`
                 },
                 {
                   type: 'text',
-                  text: 'Extraia o texto desta imagem e identifique se contém uma instrução/tutorial ou um quiz. Responda em JSON: {"type": "instruction"|"quiz", "text": "...", "summary": "..."}'
+                  text: `Extraia o texto desta imagem/documento com cuidado para preservar a formatação e caracteres especiais.
+
+Identifique se contém:
+- Uma INSTRUÇÃO (tutorial, aula, conteúdo educativo)
+- Um QUIZ (perguntas com alternativas)
+
+Responda APENAS em JSON válido (sem markdown, sem comentários):
+{
+  "type": "instruction ou quiz",
+  "text": "texto extraído completo e limpo",
+  "summary": "resumo breve (até 50 caracteres)"
+}
+
+IMPORTANTE: Limpe caracteres estranhos e normalize o texto.`
                 }
               ]
             }
@@ -153,9 +166,17 @@ Baseie as respostas APENAS no conteúdo fornecido acima.`
       const data = await response.json()
       const text = data.content[0].text
 
+      // Tentar extrair JSON
       const jsonMatch = text.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
-        return JSON.parse(jsonMatch[0])
+        const result = JSON.parse(jsonMatch[0])
+        // Limpar caracteres estranhos do texto
+        if (result.text) {
+          result.text = result.text
+            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+            .trim()
+        }
+        return result
       }
 
       return { type: 'instruction', text: '', summary: '' }

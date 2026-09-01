@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
-import { useStore } from '../store'
-import { Save, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { useStore, APP_VERSION } from '../store'
+import { Save, Eye, EyeOff, AlertCircle, CheckCircle, Loader } from 'lucide-react'
+import { claudeService } from '../services/claude'
 
 export default function SettingsTab() {
   const [apiKey, setApiKey] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [saved, setSaved] = useState(false)
   const [monitoringEnabled, setMonitoringEnabled] = useState(false)
+  const [testingApi, setTestingApi] = useState(false)
+  const [apiStatus, setApiStatus] = useState(null)
 
   const { claudeApiKey, setClaudeApiKey } = useStore()
 
@@ -27,6 +30,62 @@ export default function SettingsTab() {
     const newState = !monitoringEnabled
     setMonitoringEnabled(newState)
     localStorage.setItem('monitoringEnabled', newState)
+  }
+
+  const handleTestApi = async () => {
+    if (!apiKey.trim()) {
+      setApiStatus({ success: false, message: 'Salve uma chave primeiro' })
+      return
+    }
+
+    setTestingApi(true)
+    setApiStatus(null)
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-opus-4-1',
+          max_tokens: 100,
+          messages: [
+            {
+              role: 'user',
+              content: 'Responda com apenas "OK" se está funcionando.'
+            }
+          ]
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setApiStatus({
+          success: true,
+          message: '✅ Conexão OK! API está funcionando corretamente.'
+        })
+      } else if (response.status === 401) {
+        setApiStatus({
+          success: false,
+          message: '❌ Chave inválida ou expirada. Verifique em console.anthropic.com'
+        })
+      } else {
+        setApiStatus({
+          success: false,
+          message: `❌ Erro ${response.status}: ${response.statusText}`
+        })
+      }
+    } catch (error) {
+      setApiStatus({
+        success: false,
+        message: `❌ Erro de conexão: ${error.message}`
+      })
+    } finally {
+      setTestingApi(false)
+    }
   }
 
   return (
@@ -62,17 +121,42 @@ export default function SettingsTab() {
             </button>
           </div>
 
-          <button
-            onClick={handleSaveApiKey}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition ${
-              saved
-                ? 'bg-green-500 text-white'
-                : 'bg-primary text-white hover:bg-blue-600'
-            }`}
-          >
-            <Save size={18} />
-            {saved ? 'Salvo!' : 'Salvar Chave'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleSaveApiKey}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition ${
+                saved
+                  ? 'bg-green-500 text-white'
+                  : 'bg-primary text-white hover:bg-blue-600'
+              }`}
+            >
+              <Save size={18} />
+              {saved ? 'Salvo!' : 'Salvar'}
+            </button>
+            <button
+              onClick={handleTestApi}
+              disabled={testingApi || !apiKey.trim()}
+              className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-blue-500 text-blue-600 hover:bg-blue-50 disabled:opacity-50 transition"
+              title="Testar conexão com Claude API"
+            >
+              {testingApi ? (
+                <Loader size={18} className="animate-spin" />
+              ) : (
+                <CheckCircle size={18} />
+              )}
+              Testar
+            </button>
+          </div>
+
+          {apiStatus && (
+            <div className={`mt-3 p-3 rounded-lg text-sm ${
+              apiStatus.success
+                ? 'bg-green-50 border border-green-200 text-green-700'
+                : 'bg-red-50 border border-red-200 text-red-700'
+            }`}>
+              {apiStatus.message}
+            </div>
+          )}
 
           <p className="text-xs text-gray-500 mt-3">
             Obtenha uma chave em{' '}
@@ -119,7 +203,7 @@ export default function SettingsTab() {
           <h3 className="font-semibold mb-3">ℹ️ Sobre</h3>
           <div className="text-sm text-gray-600 space-y-2">
             <p>
-              <strong>Versão:</strong> 1.0.0
+              <strong>Versão:</strong> <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-mono">{APP_VERSION}</span>
             </p>
             <p>
               <strong>Plataforma:</strong> Web Progressiva (iOS/Android)

@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { storage } from './services/storage'
 
+export const APP_VERSION = '1.1.0' // Versão do app
+
 export const useStore = create((set, get) => ({
   // Configurações
   claudeApiKey: localStorage.getItem('claudeApiKey') || '',
@@ -8,6 +10,7 @@ export const useStore = create((set, get) => ({
     localStorage.setItem('claudeApiKey', key)
     set({ claudeApiKey: key })
   },
+  appVersion: APP_VERSION,
 
   // Projetos
   projects: [],

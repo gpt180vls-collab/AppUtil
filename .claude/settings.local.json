@@ -10,7 +10,8 @@
       "PowerShell(cmdkey /delete:git:https://github.com)",
       "PowerShell(cmdkey /list)",
       "Bash(git add *)",
-      "Bash(git commit -m 'Corrigir PDF upload e câmera monitoring *)"
+      "Bash(git commit -m 'Corrigir PDF upload e câmera monitoring *)",
+      "Bash(git commit -m 'Feature: versão do app, botão de teste API e melhor processamento de PDF *)"
     ]
   }
 }
