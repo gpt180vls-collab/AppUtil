@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(npm install *)",
-      "mcp__visualize__read_me"
+      "mcp__visualize__read_me",
+      "Bash(git push *)",
+      "Bash(git remote *)",
+      "Bash(git config *)",
+      "Bash(git credential *)",
+      "PowerShell(cmdkey /delete:git:https://github.com)",
+      "PowerShell(cmdkey /list)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'Corrigir PDF upload e câmera monitoring *)"
     ]
   }
 }

@@ -22,14 +22,22 @@ export default function CameraMonitor() {
   // Iniciar câmera
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment', // Camera traseira (ou frontal em fallback)
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      })
+      // Tentar com camera traseira primeiro, depois frontal como fallback
+      let stream
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' }
+          },
+          audio: false
+        })
+      } catch (err) {
+        // Se falhar, tentar sem preferência de câmera
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        })
+      }
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream
@@ -37,7 +45,7 @@ export default function CameraMonitor() {
       }
     } catch (error) {
       console.error('Erro ao acessar câmera:', error)
-      alert('Permita acesso à câmera nas configurações do seu dispositivo')
+      alert(`Erro ao acessar câmera:\n\n${error.name}: ${error.message}\n\nPermita acesso nas configurações do seu navegador/dispositivo.`)
       setIsActive(false)
     }
   }
@@ -62,13 +70,25 @@ export default function CameraMonitor() {
       // Desenhar vídeo no canvas
       canvas.width = videoRef.current.videoWidth
       canvas.height = videoRef.current.videoHeight
+
+      if (!context) {
+        console.error('Erro ao obter contexto do canvas')
+        return
+      }
+
       context.drawImage(videoRef.current, 0, 0)
 
       // Converter para base64
-      const imageBase64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1]
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7)
+      const imageBase64 = dataUrl.split(',')[1]
+
+      if (!imageBase64) {
+        console.error('Erro ao converter imagem para base64')
+        return
+      }
 
       // Calcular hash para evitar duplicatas
-      const currentHash = imageBase64.substring(0, 50)
+      const currentHash = imageBase64.substring(0, 100)
       if (currentHash === lastHash) {
         return // Mesma imagem que antes
       }
@@ -77,32 +97,39 @@ export default function CameraMonitor() {
       setIsProcessing(true)
       setAppProcessing(true)
 
-      // Analisar imagem
+      // Analisar imagem apenas se tiver API key
       if (claudeApiKey) {
-        const analysis = await claudeService.analyzeImage(imageBase64, claudeApiKey)
+        try {
+          const analysis = await claudeService.analyzeImage(imageBase64, claudeApiKey)
 
-        // Se detectou conteúdo válido
-        if (analysis.text && (analysis.type === 'quiz' || analysis.type === 'instruction')) {
-          // Adicionar ao projeto
-          await addDocument({
-            title: analysis.summary?.substring(0, 50) || `${analysis.type.toUpperCase()} Detectado`,
-            content: analysis.text,
-            type: analysis.type,
-            summary: analysis.summary,
-            confidence: 0.95
-          })
-
-          await loadDocuments()
-
-          setDetectionCount(prev => prev + 1)
-
-          // Notificar usuário
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('Conteúdo Detectado! 🎯', {
-              body: `${analysis.type === 'quiz' ? 'Quiz' : 'Instrução'} adicionado ao projeto`,
-              icon: analysis.type === 'quiz' ? '📝' : '📖'
+          // Se detectou conteúdo válido
+          if (analysis.text && analysis.text.length > 20) {
+            // Adicionar ao projeto
+            await addDocument({
+              title: analysis.summary?.substring(0, 50) || 'Conteúdo Detectado',
+              content: analysis.text,
+              type: analysis.type || 'instruction',
+              summary: analysis.summary,
+              confidence: analysis.confidence || 0.85
             })
+
+            await loadDocuments()
+            setDetectionCount(prev => prev + 1)
+
+            // Notificar usuário
+            try {
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Conteúdo Detectado! 🎯', {
+                  body: `Novo ${analysis.type === 'quiz' ? 'Quiz' : 'Conteúdo'} adicionado`,
+                  tag: 'content-detection'
+                })
+              }
+            } catch (notifError) {
+              console.log('Notificação não suportada')
+            }
           }
+        } catch (analysisError) {
+          console.error('Erro ao analisar com Claude:', analysisError)
         }
       }
     } catch (error) {

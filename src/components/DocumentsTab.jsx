@@ -91,11 +91,32 @@ export default function DocumentsTab() {
       try {
         setIsLoading(true)
         const reader = new FileReader()
-        reader.onload = (event) => {
-          setContent(event.target?.result || '')
+        reader.onload = async (event) => {
+          const fileContent = event.target?.result || ''
+
+          // Se é PDF ou arquivo binário, processar com Claude
+          if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+            if (claudeApiKey) {
+              // Enviar para Claude processar o PDF
+              const base64Content = fileContent.split(',')[1] || fileContent
+              const analysis = await claudeService.analyzeImage(base64Content, claudeApiKey)
+              setContent(analysis.text || '')
+            } else {
+              alert('Configure a API key do Claude para processar PDFs')
+              return
+            }
+          } else {
+            // Para arquivos de texto, usar diretamente
+            setContent(fileContent)
+          }
           setShowForm(true)
         }
-        reader.readAsText(file)
+
+        if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+          reader.readAsDataURL(file)
+        } else {
+          reader.readAsText(file)
+        }
       } finally {
         setIsLoading(false)
       }
