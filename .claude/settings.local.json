@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "mcp__visualize__read_me"
+    ]
+  }
+}
