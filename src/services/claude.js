@@ -3,33 +3,15 @@
 export const claudeService = {
   analyzeContent: async (content, apiKey) => {
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'claude-opus-5',
-          max_tokens: 1024,
-          messages: [
-            {
-              role: 'user',
-              content: `Analise este conteúdo e identifique se é uma instrução (tutorial/manual) ou um quiz (perguntas/teste).
-
-Responda em JSON com este formato:
-{
-  "type": "instruction" ou "quiz",
-  "confidence": 0.0 a 1.0,
-  "summary": "resumo breve",
-  "questions": [] // apenas se for quiz
-}
-
-Conteúdo:
-${content}`
-            }
-          ]
+          type: 'content',
+          apiKey,
+          content
         })
       })
 
@@ -114,48 +96,15 @@ Baseie as respostas APENAS no conteúdo fornecido acima.`
 
   analyzeImage: async (imageBase64, apiKey) => {
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'claude-opus-5',
-          max_tokens: 2048,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'image',
-                  source: {
-                    type: 'base64',
-                    media_type: 'image/jpeg',
-                    data: imageBase64
-                  }
-                },
-                {
-                  type: 'text',
-                  text: `Extraia o texto desta imagem/documento com cuidado para preservar a formatação e caracteres especiais.
-
-Identifique se contém:
-- Uma INSTRUÇÃO (tutorial, aula, conteúdo educativo)
-- Um QUIZ (perguntas com alternativas)
-
-Responda APENAS em JSON válido (sem markdown, sem comentários):
-{
-  "type": "instruction ou quiz",
-  "text": "texto extraído completo e limpo",
-  "summary": "resumo breve (até 50 caracteres)"
-}
-
-IMPORTANTE: Limpe caracteres estranhos e normalize o texto.`
-                }
-              ]
-            }
-          ]
+          type: 'image',
+          apiKey,
+          imageBase64
         })
       })
 
