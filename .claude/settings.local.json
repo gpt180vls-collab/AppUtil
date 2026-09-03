@@ -11,7 +11,20 @@
       "PowerShell(cmdkey /list)",
       "Bash(git add *)",
       "Bash(git commit -m 'Corrigir PDF upload e câmera monitoring *)",
-      "Bash(git commit -m 'Feature: versão do app, botão de teste API e melhor processamento de PDF *)"
+      "Bash(git commit -m 'Feature: versão do app, botão de teste API e melhor processamento de PDF *)",
+      "Bash(git commit --allow-empty -m 'Rebuild trigger *)",
+      "Bash(git branch *)",
+      "Bash(git commit --allow-empty -m 'Force rebuild v1.1.0 *)",
+      "Bash(git commit --allow-empty -m 'Trigger rebuild for v1.1.0 *)",
+      "Bash(git commit -m 'Update version to 1.1.0 in package.json *)",
+      "Bash(npm run *)",
+      "Bash(git commit --allow-empty -m 'REBUILD v1.1.0 - Force Vercel deploy *)",
+      "Bash(git commit -m 'Change version badge color to green to verify Vercel rebuild *)",
+      "Bash(git commit --allow-empty -m 'Force Vercel redeploy with v1.1.0 *)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Bash(git commit -m 'Fix: corrigir upload de arquivo, adicionar visualização da câmera e melhorar teste da API *)",
+      "Bash(git commit *)"
     ]
   }
 }
