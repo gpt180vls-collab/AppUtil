@@ -84,12 +84,20 @@ ${content}`
     })
 
     if (!response.ok) {
-      const errorData = await response.json()
-      return res.status(response.status).json({ error: errorData.error?.message || 'API error' })
+      const errorData = await response.json().catch(() => ({}))
+      console.error('Anthropic API error:', response.status, errorData)
+      return res.status(response.status).json({ error: errorData.error?.message || `API error (${response.status})` })
     }
 
     const data = await response.json()
-    const text = data.content[0].text
+    const textBlock = data.content?.find(block => block.type === 'text')
+
+    if (!textBlock || !textBlock.text) {
+      console.error('Unexpected Anthropic response shape:', JSON.stringify(data))
+      return res.status(502).json({ error: 'Resposta inesperada da API Claude (sem bloco de texto)' })
+    }
+
+    const text = textBlock.text
 
     // Parse JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/)
