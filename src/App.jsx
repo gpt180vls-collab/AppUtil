@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useStore } from './store'
 import { BookOpen, Settings, FileText, CheckCircle, Home } from 'lucide-react'
 import ProjectsTab from './components/ProjectsTab'
@@ -6,48 +6,9 @@ import DocumentsTab from './components/DocumentsTab'
 import QuizzesTab from './components/QuizzesTab'
 import SettingsTab from './components/SettingsTab'
 import CameraMonitor from './components/CameraMonitor'
-import { useScreenCapture } from './hooks/useScreenCapture'
-import { claudeService } from './services/claude'
 
 export default function App() {
-  const { currentTab, setCurrentTab, loadProjects, selectedProject, claudeApiKey, addDocument } = useStore()
-  const [isCapturing, setIsCapturing] = useState(false)
-
-  const handleScreenCapture = async (imageBase64) => {
-    if (!imageBase64 || !claudeApiKey || !selectedProject) {
-      alert('Projeto e API key são necessários')
-      return
-    }
-
-    setIsCapturing(true)
-    try {
-      const analysis = await claudeService.analyzeImage(imageBase64, claudeApiKey)
-
-      if (analysis.type === 'quiz') {
-        // Se for pergunta, ir para a aba de quizzes
-        alert(`📝 Pergunta detectada:\n\n${analysis.summary}`)
-        setCurrentTab('quizzes')
-      } else {
-        // Se for conteúdo, adicionar ao projeto
-        await addDocument({
-          title: analysis.summary?.substring(0, 50) || 'Conteúdo Capturado',
-          content: analysis.text,
-          type: analysis.type || 'instruction',
-          summary: analysis.summary,
-          confidence: analysis.confidence || 0.85
-        })
-        await loadProjects()
-        alert(`✅ Conteúdo adicionado ao projeto!\n\n${analysis.summary}`)
-      }
-    } catch (error) {
-      console.error('Erro ao processar captura:', error)
-      alert('Erro ao processar a captura')
-    } finally {
-      setIsCapturing(false)
-    }
-  }
-
-  useScreenCapture(handleScreenCapture)
+  const { currentTab, setCurrentTab, loadProjects, selectedProject } = useStore()
 
   useEffect(() => {
     loadProjects()
