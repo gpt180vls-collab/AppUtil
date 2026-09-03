@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { storage } from './services/storage'
 
-export const APP_VERSION = '1.1.6' // Versão do app
+export const APP_VERSION = '1.1.7' // Versão do app
 
 export const useStore = create((set, get) => ({
   // Configurações

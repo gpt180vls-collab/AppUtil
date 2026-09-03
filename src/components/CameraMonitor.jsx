@@ -96,7 +96,17 @@ export default function CameraMonitor() {
   }
 
   const captureFrameFromCamera = async () => {
-    if (!videoRef.current || !canvasRef.current || !claudeApiKey || !selectedProject) return
+    console.log('📸 Iniciando captura... videoRef:', !!videoRef.current, 'canvasRef:', !!canvasRef.current, 'apiKey:', !!claudeApiKey, 'project:', !!selectedProject)
+
+    if (!videoRef.current || !canvasRef.current || !claudeApiKey || !selectedProject) {
+      const missing = []
+      if (!videoRef.current) missing.push('vídeo')
+      if (!canvasRef.current) missing.push('canvas')
+      if (!claudeApiKey) missing.push('API key')
+      if (!selectedProject) missing.push('projeto')
+      alert(`❌ Faltam: ${missing.join(', ')}`)
+      return
+    }
 
     try {
       const canvas = canvasRef.current
@@ -105,21 +115,31 @@ export default function CameraMonitor() {
       canvas.width = videoRef.current.videoWidth
       canvas.height = videoRef.current.videoHeight
 
-      if (!context) return
+      if (!context) {
+        alert('❌ Erro: canvas context não disponível')
+        return
+      }
 
       context.drawImage(videoRef.current, 0, 0)
       const dataUrl = canvas.toDataURL('image/jpeg', 0.8)
       const imageBase64 = dataUrl.split(',')[1]
 
-      if (!imageBase64) return
+      if (!imageBase64) {
+        alert('❌ Erro: não conseguiu converter para base64')
+        return
+      }
+
+      console.log('📤 Enviando para Claude...')
+      alert('⏳ Analisando imagem...')
 
       // Analisar com Claude
       const analysis = await claudeService.analyzeImage(imageBase64, claudeApiKey)
 
+      console.log('✅ Resposta do Claude:', analysis)
+
       if (analysis.text && analysis.text.length > 20) {
         if (analysis.type === 'quiz') {
-          alert(`📝 PERGUNTA DETECTADA:\n\n${analysis.summary}\n\nIr para Quizzes para responder?`)
-          // Aqui poderíamos navegar para a aba de quizzes
+          alert(`📝 PERGUNTA DETECTADA:\n\n${analysis.summary}`)
         } else {
           // Adicionar como instrução
           await addDocument({
@@ -130,12 +150,14 @@ export default function CameraMonitor() {
             confidence: analysis.confidence || 0.85
           })
           await loadDocuments()
-          alert(`✅ Conteúdo capturado e adicionado!\n\n${analysis.summary}`)
+          alert(`✅ Conteúdo capturado!\n\n${analysis.summary}`)
         }
+      } else {
+        alert('⚠️ Imagem não contém conteúdo detectável')
       }
     } catch (error) {
-      console.error('Erro ao capturar frame:', error)
-      alert(`Erro: ${error.message}`)
+      console.error('❌ Erro ao capturar frame:', error)
+      alert(`❌ Erro: ${error.message}`)
     }
   }
 
