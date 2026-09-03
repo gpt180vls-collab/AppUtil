@@ -11,7 +11,7 @@ export const claudeService = {
           'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
-          model: 'claude-opus-4-1',
+          model: 'claude-opus-5',
           max_tokens: 1024,
           messages: [
             {
@@ -63,7 +63,7 @@ ${content}`
           'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
-          model: 'claude-opus-4-1',
+          model: 'claude-opus-5',
           max_tokens: 2048,
           messages: [
             {
@@ -122,7 +122,7 @@ Baseie as respostas APENAS no conteúdo fornecido acima.`
           'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
-          model: 'claude-opus-4-1',
+          model: 'claude-opus-5',
           max_tokens: 2048,
           messages: [
             {
