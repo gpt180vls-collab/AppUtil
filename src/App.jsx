@@ -1,10 +1,11 @@
 import { useEffect } from 'react'
 import { useStore } from './store'
-import { BookOpen, Settings, FileText, CheckCircle, Home } from 'lucide-react'
+import { BookOpen, Settings, FileText, CheckCircle, Home, MessageSquare } from 'lucide-react'
 import ProjectsTab from './components/ProjectsTab'
 import DocumentsTab from './components/DocumentsTab'
 import QuizzesTab from './components/QuizzesTab'
 import SettingsTab from './components/SettingsTab'
+import ChatTab from './components/ChatTab'
 import CameraMonitor from './components/CameraMonitor'
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
 
   const tabs = [
     { id: 'projects', label: 'Projetos', icon: Home, component: ProjectsTab },
+    { id: 'chat', label: 'Chat', icon: MessageSquare, component: ChatTab },
     { id: 'documents', label: 'Instruções', icon: FileText, component: DocumentsTab },
     { id: 'quizzes', label: 'Quizzes', icon: CheckCircle, component: QuizzesTab },
     { id: 'settings', label: 'Configurações', icon: Settings, component: SettingsTab }

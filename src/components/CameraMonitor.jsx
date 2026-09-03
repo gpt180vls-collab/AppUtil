@@ -1,25 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { claudeService } from '../services/claude'
-import { X, Loader, Maximize2, Minimize2 } from 'lucide-react'
+import { X, Loader, Maximize2, Minimize2, Camera } from 'lucide-react'
 
 export default function CameraMonitor() {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const [isActive, setIsActive] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [lastHash, setLastHash] = useState(null)
-  const [detectionCount, setDetectionCount] = useState(0)
   const [isExpanded, setIsExpanded] = useState(false)
-  const [lastCaptures, setLastCaptures] = useState([])
-  const [lastDetection, setLastDetection] = useState(null)
   const [pendingStream, setPendingStream] = useState(null)
 
   const {
     selectedProject,
     claudeApiKey,
+    documents,
     addDocument,
     loadDocuments,
+    addChatMessage,
+    updateChatMessage,
+    setCurrentTab,
     setIsProcessing: setAppProcessing
   } = useStore()
 
@@ -71,44 +71,43 @@ export default function CameraMonitor() {
     if (!isActive) return
 
     const handleKeyDown = (event) => {
-      console.log('🔑 Tecla pressionada:', event.key, 'KeyCode:', event.keyCode)
-
       // Pau de selfie Bluetooth simula Volume+ (VolumeUp), Enter, ou Space
       if (event.key === 'VolumeUp' || event.key === '+' || event.keyCode === 13 || event.keyCode === 32 || event.key === ' ') {
         event.preventDefault()
-        console.log('📷 Capturando frame do pau de selfie...')
         captureFrameFromCamera()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isActive, canvasRef, claudeApiKey, addDocument, loadDocuments, selectedProject])
+  }, [isActive, isProcessing, claudeApiKey, selectedProject, documents])
 
   const stopCamera = () => {
     if (videoRef.current?.srcObject) {
       videoRef.current.srcObject.getTracks().forEach(track => track.stop())
     }
     setIsActive(false)
-    setDetectionCount(0)
-    setLastCaptures([])
-    setLastDetection(null)
   }
 
   const captureFrameFromCamera = async () => {
-    console.log('📸 Iniciando captura... videoRef:', !!videoRef.current, 'canvasRef:', !!canvasRef.current, 'apiKey:', !!claudeApiKey, 'project:', !!selectedProject)
-
-    if (!videoRef.current || !canvasRef.current || !claudeApiKey || !selectedProject) {
+    if (!videoRef.current || !canvasRef.current || !claudeApiKey || !selectedProject || isProcessing) {
       const missing = []
       if (!videoRef.current) missing.push('vídeo')
       if (!canvasRef.current) missing.push('canvas')
       if (!claudeApiKey) missing.push('API key')
       if (!selectedProject) missing.push('projeto')
-      alert(`❌ Faltam: ${missing.join(', ')}`)
+      if (missing.length > 0) {
+        alert(`❌ Faltam: ${missing.join(', ')}`)
+      }
       return
     }
 
+    let chatMsg = null
+
     try {
+      setIsProcessing(true)
+      setAppProcessing(true)
+
       const canvas = canvasRef.current
       const context = canvas.getContext('2d')
 
@@ -129,124 +128,90 @@ export default function CameraMonitor() {
         return
       }
 
-      console.log('📤 Enviando para Claude...')
-      alert('⏳ Analisando imagem...')
+      // Adiciona a captura no chat imediatamente (estado "processando")
+      chatMsg = await addChatMessage({
+        image: dataUrl,
+        status: 'processing'
+      })
 
       // Analisar com Claude
       const analysis = await claudeService.analyzeImage(imageBase64, claudeApiKey)
 
-      console.log('✅ Resposta do Claude:', analysis)
+      if (!analysis.text || analysis.text.length <= 20) {
+        await updateChatMessage(chatMsg.id, {
+          status: 'error',
+          error: 'Não foi possível identificar conteúdo na imagem'
+        })
+        return
+      }
 
-      if (analysis.text && analysis.text.length > 20) {
-        if (analysis.type === 'quiz') {
-          alert(`📝 PERGUNTA DETECTADA:\n\n${analysis.summary}`)
-        } else {
-          // Adicionar como instrução
-          await addDocument({
-            title: analysis.summary?.substring(0, 50) || 'Captura do Pau de Selfie',
-            content: analysis.text,
-            type: analysis.type || 'instruction',
-            summary: analysis.summary,
-            confidence: analysis.confidence || 0.85
-          })
-          await loadDocuments()
-          alert(`✅ Conteúdo capturado!\n\n${analysis.summary}`)
-        }
+      if (analysis.type === 'quiz') {
+        // Salvar como quiz/pergunta
+        await addDocument({
+          title: analysis.summary?.substring(0, 50) || 'Pergunta capturada',
+          content: analysis.text,
+          type: 'quiz',
+          summary: analysis.summary,
+          confidence: analysis.confidence || 0.85
+        })
+        await loadDocuments()
+
+        // Responder automaticamente usando as instruções já salvas como contexto
+        const courseContent = documents
+          .filter(d => d.type === 'instruction')
+          .map(d => d.content)
+          .join('\n\n---\n\n')
+
+        const result = await claudeService.answerQuestion(analysis.text, courseContent, claudeApiKey)
+
+        await updateChatMessage(chatMsg.id, {
+          status: 'done',
+          resultType: 'quiz',
+          summary: analysis.summary,
+          answer: result.answer,
+          explanation: result.explanation
+        })
       } else {
-        alert('⚠️ Imagem não contém conteúdo detectável')
+        // Salvar como instrução/conteúdo
+        await addDocument({
+          title: analysis.summary?.substring(0, 50) || 'Conteúdo capturado',
+          content: analysis.text,
+          type: analysis.type || 'instruction',
+          summary: analysis.summary,
+          confidence: analysis.confidence || 0.85
+        })
+        await loadDocuments()
+
+        await updateChatMessage(chatMsg.id, {
+          status: 'done',
+          resultType: 'instruction',
+          summary: analysis.summary
+        })
+      }
+
+      // Notificação
+      try {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('✅ Captura processada!', {
+            body: analysis.type === 'quiz' ? 'Pergunta respondida no chat' : 'Instrução salva',
+            tag: 'content-detection'
+          })
+        }
+      } catch (notifError) {
+        console.log('Notificação não suportada')
       }
     } catch (error) {
       console.error('❌ Erro ao capturar frame:', error)
-      alert(`❌ Erro: ${error.message}`)
-    }
-  }
-
-  const captureAndAnalyze = async () => {
-    if (!videoRef.current || !canvasRef.current || isProcessing) return
-
-    try {
-      const canvas = canvasRef.current
-      const context = canvas.getContext('2d')
-
-      canvas.width = videoRef.current.videoWidth
-      canvas.height = videoRef.current.videoHeight
-
-      if (!context) return
-
-      context.drawImage(videoRef.current, 0, 0)
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.7)
-      const imageBase64 = dataUrl.split(',')[1]
-
-      if (!imageBase64) return
-
-      const currentHash = imageBase64.substring(0, 100)
-      if (currentHash === lastHash) return
-
-      setLastHash(currentHash)
-      setIsProcessing(true)
-      setAppProcessing(true)
-
-      // Adicionar ao histórico de capturas
-      setLastCaptures(prev => [{
-        image: dataUrl,
-        timestamp: new Date().toLocaleTimeString(),
-        type: 'captura'
-      }, ...prev].slice(0, 5))
-
-      if (claudeApiKey) {
-        try {
-          const analysis = await claudeService.analyzeImage(imageBase64, claudeApiKey)
-
-          if (analysis.text && analysis.text.length > 20) {
-            await addDocument({
-              title: analysis.summary?.substring(0, 50) || 'Conteúdo Detectado',
-              content: analysis.text,
-              type: analysis.type || 'instruction',
-              summary: analysis.summary,
-              confidence: analysis.confidence || 0.85
-            })
-
-            await loadDocuments()
-            setDetectionCount(prev => prev + 1)
-
-            // Atualizar última detecção
-            setLastDetection({
-              type: analysis.type === 'quiz' ? '📝 PERGUNTA' : '📖 INSTRUÇÃO',
-              summary: analysis.summary?.substring(0, 60) || 'Conteúdo detectado',
-              confidence: Math.round((analysis.confidence || 0.85) * 100),
-              time: new Date().toLocaleTimeString()
-            })
-
-            // Notificação
-            try {
-              if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification('✅ Conteúdo Detectado!', {
-                  body: `${analysis.type === 'quiz' ? 'PERGUNTA' : 'INSTRUÇÃO'} adicionada ao projeto`,
-                  tag: 'content-detection'
-                })
-              }
-            } catch (notifError) {
-              console.log('Notificação não suportada')
-            }
-          }
-        } catch (analysisError) {
-          console.error('Erro ao analisar com Claude:', analysisError)
-        }
+      if (chatMsg) {
+        await updateChatMessage(chatMsg.id, { status: 'error', error: error.message })
+      } else {
+        alert(`❌ Erro: ${error.message}`)
       }
-    } catch (error) {
-      console.error('Erro ao analisar frame:', error)
     } finally {
       setIsProcessing(false)
       setAppProcessing(false)
     }
   }
-
-  useEffect(() => {
-    if (!isActive || !selectedProject || !claudeApiKey) return
-
-    const interval = setInterval(captureAndAnalyze, 3000)
-    return () => clearInterval(interval)
-  }, [isActive, selectedProject, claudeApiKey, lastHash, isProcessing])
 
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
@@ -271,70 +236,48 @@ export default function CameraMonitor() {
             {/* Status Badge */}
             <div className="absolute top-2 left-2 bg-black/70 rounded-lg px-2 py-1">
               <div className="flex items-center gap-1 text-white text-xs">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                {isProcessing ? 'Analisando...' : 'Ao vivo'}
+                <span className={`w-2 h-2 rounded-full ${isProcessing ? 'bg-yellow-400 animate-pulse' : 'bg-green-500'}`}></span>
+                {isProcessing ? 'Analisando...' : 'Pronto'}
               </div>
             </div>
 
             <canvas ref={canvasRef} className="hidden" />
           </div>
 
-          {/* Última detecção */}
-          {lastDetection && (
-            <div className="bg-blue-50 border-b border-blue-200 p-2">
-              <p className="text-xs font-bold text-blue-700">{lastDetection.type}</p>
-              <p className="text-xs text-blue-600 line-clamp-1">{lastDetection.summary}</p>
-              <p className="text-xs text-blue-500 mt-1">✓ {lastDetection.confidence}% • {lastDetection.time}</p>
-            </div>
-          )}
-
-          {/* Histórico de capturas (expandido) */}
-          {isExpanded && lastCaptures.length > 0 && (
-            <div className="bg-gray-50 border-b border-gray-200 p-2 max-h-24 overflow-y-auto">
-              <p className="text-xs font-semibold text-gray-700 mb-1">Últimas capturas:</p>
-              <div className="flex gap-2">
-                {lastCaptures.map((capture, idx) => (
-                  <div key={idx} className="relative flex-shrink-0">
-                    <img src={capture.image} alt={`Captura ${idx}`} className="w-16 h-16 rounded object-cover border border-gray-300" />
-                    <p className="text-xs text-gray-500 text-center mt-1">{capture.timestamp}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Estatísticas */}
-          <div className="p-2 bg-gray-50 border-t">
-            <div className="flex justify-between items-center text-xs gap-2">
-              <span className="text-gray-700 flex-1">
-                <strong>{detectionCount}</strong> detectado{detectionCount !== 1 ? 's' : ''}
-              </span>
-              <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="text-primary hover:text-blue-700 transition"
-                title={isExpanded ? 'Minimizar' : 'Expandir'}
-              >
-                {isExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-              </button>
-              <button
-                onClick={captureFrameFromCamera}
-                disabled={isProcessing}
-                className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:opacity-50"
-                title="Capturar frame (ou Volume no pau de selfie)"
-              >
-                📸 Capturar
-              </button>
-            </div>
-          </div>
+          {/* Dica */}
+          <button
+            onClick={() => setCurrentTab('chat')}
+            className="bg-blue-50 border-b border-blue-200 p-2 text-xs text-blue-700 hover:bg-blue-100 transition text-left"
+          >
+            💬 Resultados aparecem na aba <strong>Chat</strong> — toque para ver
+          </button>
 
           {/* Controls */}
-          <button
-            onClick={stopCamera}
-            className="w-full p-2 bg-red-500 text-white hover:bg-red-600 flex items-center justify-center gap-1 text-xs font-medium transition"
-          >
-            <X size={14} />
-            Parar Monitoramento
-          </button>
+          <div className="flex">
+            <button
+              onClick={captureFrameFromCamera}
+              disabled={isProcessing}
+              className="flex-1 flex items-center justify-center gap-2 px-2 py-3 bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 text-sm font-medium transition"
+              title="Capturar frame (ou Volume no pau de selfie)"
+            >
+              {isProcessing ? <Loader size={16} className="animate-spin" /> : <Camera size={16} />}
+              Capturar
+            </button>
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="px-3 py-3 bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
+              title={isExpanded ? 'Minimizar' : 'Expandir'}
+            >
+              {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
+            <button
+              onClick={stopCamera}
+              className="px-3 py-3 bg-red-500 text-white hover:bg-red-600 transition"
+              title="Parar câmera"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
       ) : (
         <button
@@ -345,9 +288,9 @@ export default function CameraMonitor() {
               ? 'bg-primary text-white hover:bg-blue-600'
               : 'bg-gray-300 text-gray-600 cursor-not-allowed'
           }`}
-          title={!claudeApiKey ? 'Configure a API key do Claude' : 'Iniciar monitoramento'}
+          title={!claudeApiKey ? 'Configure a API key do Claude' : 'Iniciar câmera'}
         >
-          📷 Monitorar
+          📷 Câmera
         </button>
       )}
     </div>

@@ -71,6 +71,12 @@ Responda em JSON com este formato:
 Conteúdo:
 ${content}`
       })
+    } else if (type === 'raw') {
+      // Prompt já pronto, montado pelo cliente (ex: responder pergunta com contexto)
+      body.messages.push({
+        role: 'user',
+        content
+      })
     }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {

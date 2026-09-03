@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { storage } from './services/storage'
 
-export const APP_VERSION = '1.2.3' // Versão do app
+export const APP_VERSION = '1.3.0' // Versão do app
 
 export const useStore = create((set, get) => ({
   // Configurações
@@ -73,6 +73,28 @@ export const useStore = create((set, get) => ({
     if (!projectId) return
     await storage.updateQuizAnswers(projectId, quizId, answers)
     await get().loadQuizzes()
+  },
+
+  // Chat de capturas (câmera)
+  chatMessages: [],
+  loadChatMessages: async () => {
+    const projectId = get().selectedProject
+    if (!projectId) return
+    const messages = await storage.getChatMessages(projectId)
+    set({ chatMessages: messages })
+  },
+  addChatMessage: async (message) => {
+    const projectId = get().selectedProject
+    if (!projectId) return
+    const msg = await storage.addChatMessage(projectId, message)
+    await get().loadChatMessages()
+    return msg
+  },
+  updateChatMessage: async (messageId, updates) => {
+    const projectId = get().selectedProject
+    if (!projectId) return
+    await storage.updateChatMessage(projectId, messageId, updates)
+    await get().loadChatMessages()
   },
 
   // UI State

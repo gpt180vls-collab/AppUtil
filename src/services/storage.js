@@ -185,5 +185,44 @@ export const storage = {
         await put('projects', project)
       }
     }
+  },
+
+  // Chat de capturas (câmera)
+  getChatMessages: async (projectId) => {
+    const projects = await getAll('projects')
+    const project = projects.find(p => p.id === projectId)
+    return project?.chatMessages || []
+  },
+
+  addChatMessage: async (projectId, message) => {
+    const projects = await getAll('projects')
+    const project = projects.find(p => p.id === projectId)
+
+    if (project) {
+      const msg = {
+        id: Date.now().toString() + Math.random().toString(36).slice(2, 7),
+        ...message,
+        createdAt: Date.now(),
+        projectId
+      }
+      project.chatMessages = project.chatMessages || []
+      project.chatMessages.push(msg)
+      await put('projects', project)
+      return msg
+    }
+  },
+
+  updateChatMessage: async (projectId, messageId, updates) => {
+    const projects = await getAll('projects')
+    const project = projects.find(p => p.id === projectId)
+
+    if (project) {
+      const msg = (project.chatMessages || []).find(m => m.id === messageId)
+      if (msg) {
+        Object.assign(msg, updates)
+        await put('projects', project)
+      }
+      return msg
+    }
   }
 }
