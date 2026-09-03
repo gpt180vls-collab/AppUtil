@@ -39,8 +39,19 @@ export default function CameraMonitor() {
       }
 
       if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        setIsActive(true)
+        try {
+          videoRef.current.srcObject = stream
+          setIsActive(true)
+          console.log('Câmera iniciada com sucesso')
+        } catch (refError) {
+          console.error('Erro ao setar srcObject:', refError)
+          alert(`Erro ao iniciar câmera: ${refError.message}`)
+          setIsActive(false)
+        }
+      } else {
+        console.error('videoRef.current não existe')
+        alert('Erro: Referência de vídeo não disponível')
+        setIsActive(false)
       }
     } catch (error) {
       console.error('Erro ao acessar câmera:', error)
