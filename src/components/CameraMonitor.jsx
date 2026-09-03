@@ -13,6 +13,7 @@ export default function CameraMonitor() {
   const [isExpanded, setIsExpanded] = useState(false)
   const [lastCaptures, setLastCaptures] = useState([])
   const [lastDetection, setLastDetection] = useState(null)
+  const [pendingStream, setPendingStream] = useState(null)
 
   const {
     selectedProject,
@@ -38,43 +39,32 @@ export default function CameraMonitor() {
         })
       }
 
-      if (videoRef.current) {
-        try {
-          videoRef.current.srcObject = stream
-          setIsActive(true)
-          console.log('Câmera iniciada com sucesso')
-        } catch (refError) {
-          console.error('Erro ao setar srcObject:', refError)
-          alert(`Erro ao iniciar câmera: ${refError.message}`)
-          setIsActive(false)
-        }
-      } else {
-        console.error('videoRef.current não existe - tentando novamente em 500ms')
-        // Retry após 500ms quando a ref estiver pronta
-        setTimeout(() => {
-          if (videoRef.current) {
-            try {
-              videoRef.current.srcObject = stream
-              setIsActive(true)
-              console.log('Câmera iniciada com sucesso (retry)')
-            } catch (refError) {
-              console.error('Erro ao setar srcObject (retry):', refError)
-              alert(`Erro ao iniciar câmera: ${refError.message}`)
-              setIsActive(false)
-            }
-          } else {
-            console.error('videoRef.current ainda não está disponível')
-            alert('Erro: Referência de vídeo não disponível')
-            setIsActive(false)
-          }
-        }, 500)
-      }
+      // Guardar stream em estado e setar isActive
+      // O useEffect vai conectar ao ref quando estiver pronto
+      setPendingStream(stream)
+      setIsActive(true)
+      console.log('Stream obtido, aguardando conexão ao ref')
     } catch (error) {
       console.error('Erro ao acessar câmera:', error)
       alert(`Erro ao acessar câmera:\n\n${error.name}: ${error.message}\n\nPermita acesso nas configurações do seu navegador/dispositivo.`)
       setIsActive(false)
     }
   }
+
+  // useEffect para conectar stream ao ref quando estiver pronto
+  useEffect(() => {
+    if (pendingStream && videoRef.current && isActive) {
+      try {
+        videoRef.current.srcObject = pendingStream
+        console.log('Stream conectado ao ref com sucesso')
+        setPendingStream(null)
+      } catch (error) {
+        console.error('Erro ao conectar stream:', error)
+        alert(`Erro ao iniciar câmera: ${error.message}`)
+        setIsActive(false)
+      }
+    }
+  }, [pendingStream, isActive])
 
   const stopCamera = () => {
     if (videoRef.current?.srcObject) {
