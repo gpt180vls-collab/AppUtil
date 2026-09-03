@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { claudeService } from '../services/claude'
-import { X, Loader } from 'lucide-react'
+import { X, Loader, Maximize2, Minimize2 } from 'lucide-react'
 
 export default function CameraMonitor() {
   const videoRef = useRef(null)
@@ -10,6 +10,9 @@ export default function CameraMonitor() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [lastHash, setLastHash] = useState(null)
   const [detectionCount, setDetectionCount] = useState(0)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [lastCaptures, setLastCaptures] = useState([])
+  const [lastDetection, setLastDetection] = useState(null)
 
   const {
     selectedProject,
@@ -22,17 +25,13 @@ export default function CameraMonitor() {
   // Iniciar câmera
   const startCamera = async () => {
     try {
-      // Tentar com camera traseira primeiro, depois frontal como fallback
       let stream
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' }
-          },
+          video: { facingMode: { ideal: 'environment' } },
           audio: false
         })
       } catch (err) {
-        // Se falhar, tentar sem preferência de câmera
         stream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: false
@@ -50,16 +49,16 @@ export default function CameraMonitor() {
     }
   }
 
-  // Parar câmera
   const stopCamera = () => {
     if (videoRef.current?.srcObject) {
       videoRef.current.srcObject.getTracks().forEach(track => track.stop())
     }
     setIsActive(false)
     setDetectionCount(0)
+    setLastCaptures([])
+    setLastDetection(null)
   }
 
-  // Capturar frame e analisar
   const captureAndAnalyze = async () => {
     if (!videoRef.current || !canvasRef.current || isProcessing) return
 
@@ -67,44 +66,36 @@ export default function CameraMonitor() {
       const canvas = canvasRef.current
       const context = canvas.getContext('2d')
 
-      // Desenhar vídeo no canvas
       canvas.width = videoRef.current.videoWidth
       canvas.height = videoRef.current.videoHeight
 
-      if (!context) {
-        console.error('Erro ao obter contexto do canvas')
-        return
-      }
+      if (!context) return
 
       context.drawImage(videoRef.current, 0, 0)
-
-      // Converter para base64
       const dataUrl = canvas.toDataURL('image/jpeg', 0.7)
       const imageBase64 = dataUrl.split(',')[1]
 
-      if (!imageBase64) {
-        console.error('Erro ao converter imagem para base64')
-        return
-      }
+      if (!imageBase64) return
 
-      // Calcular hash para evitar duplicatas
       const currentHash = imageBase64.substring(0, 100)
-      if (currentHash === lastHash) {
-        return // Mesma imagem que antes
-      }
+      if (currentHash === lastHash) return
 
       setLastHash(currentHash)
       setIsProcessing(true)
       setAppProcessing(true)
 
-      // Analisar imagem apenas se tiver API key
+      // Adicionar ao histórico de capturas
+      setLastCaptures(prev => [{
+        image: dataUrl,
+        timestamp: new Date().toLocaleTimeString(),
+        type: 'captura'
+      }, ...prev].slice(0, 5))
+
       if (claudeApiKey) {
         try {
           const analysis = await claudeService.analyzeImage(imageBase64, claudeApiKey)
 
-          // Se detectou conteúdo válido
           if (analysis.text && analysis.text.length > 20) {
-            // Adicionar ao projeto
             await addDocument({
               title: analysis.summary?.substring(0, 50) || 'Conteúdo Detectado',
               content: analysis.text,
@@ -116,11 +107,19 @@ export default function CameraMonitor() {
             await loadDocuments()
             setDetectionCount(prev => prev + 1)
 
-            // Notificar usuário
+            // Atualizar última detecção
+            setLastDetection({
+              type: analysis.type === 'quiz' ? '📝 PERGUNTA' : '📖 INSTRUÇÃO',
+              summary: analysis.summary?.substring(0, 60) || 'Conteúdo detectado',
+              confidence: Math.round((analysis.confidence || 0.85) * 100),
+              time: new Date().toLocaleTimeString()
+            })
+
+            // Notificação
             try {
               if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification('Conteúdo Detectado! 🎯', {
-                  body: `Novo ${analysis.type === 'quiz' ? 'Quiz' : 'Conteúdo'} adicionado`,
+                new Notification('✅ Conteúdo Detectado!', {
+                  body: `${analysis.type === 'quiz' ? 'PERGUNTA' : 'INSTRUÇÃO'} adicionada ao projeto`,
                   tag: 'content-detection'
                 })
               }
@@ -140,16 +139,13 @@ export default function CameraMonitor() {
     }
   }
 
-  // Monitoramento contínuo
   useEffect(() => {
     if (!isActive || !selectedProject || !claudeApiKey) return
 
-    // Monitorar a cada 3 segundos
     const interval = setInterval(captureAndAnalyze, 3000)
     return () => clearInterval(interval)
   }, [isActive, selectedProject, claudeApiKey, lastHash, isProcessing])
 
-  // Pedir permissão para notificações
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission()
@@ -159,42 +155,75 @@ export default function CameraMonitor() {
   if (!selectedProject) return null
 
   return (
-    <div className="fixed bottom-20 right-4 z-40">
+    <div className={`fixed ${isExpanded ? 'inset-4' : 'bottom-20 right-4'} z-40 transition-all`}>
       {isActive ? (
-        <div className="bg-white rounded-lg shadow-xl overflow-hidden border-2 border-primary">
-          {/* Video Feed */}
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            className="w-48 h-48 object-cover bg-black"
-          />
-          <canvas ref={canvasRef} className="hidden" />
+        <div className={`bg-white rounded-lg shadow-2xl overflow-hidden border-2 border-primary flex flex-col ${isExpanded ? 'h-full' : ''}`}>
+          <div className="relative bg-black">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              className={`w-full object-cover bg-black ${isExpanded ? 'h-96' : 'w-64 h-64'}`}
+            />
 
-          {/* Status */}
-          <div className="p-2 bg-gray-50 border-t">
-            <div className="text-xs text-center">
-              {isProcessing ? (
-                <div className="flex items-center justify-center gap-1 text-orange-600">
-                  <Loader size={12} className="animate-spin" />
-                  Analisando...
-                </div>
-              ) : (
-                <span className="text-green-600 font-semibold">🔴 Ao vivo</span>
-              )}
+            {/* Status Badge */}
+            <div className="absolute top-2 left-2 bg-black/70 rounded-lg px-2 py-1">
+              <div className="flex items-center gap-1 text-white text-xs">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                {isProcessing ? 'Analisando...' : 'Ao vivo'}
+              </div>
             </div>
-            <div className="text-xs text-gray-600 text-center mt-1">
-              {detectionCount} detectado{detectionCount !== 1 ? 's' : ''}
+
+            <canvas ref={canvasRef} className="hidden" />
+          </div>
+
+          {/* Última detecção */}
+          {lastDetection && (
+            <div className="bg-blue-50 border-b border-blue-200 p-2">
+              <p className="text-xs font-bold text-blue-700">{lastDetection.type}</p>
+              <p className="text-xs text-blue-600 line-clamp-1">{lastDetection.summary}</p>
+              <p className="text-xs text-blue-500 mt-1">✓ {lastDetection.confidence}% • {lastDetection.time}</p>
+            </div>
+          )}
+
+          {/* Histórico de capturas (expandido) */}
+          {isExpanded && lastCaptures.length > 0 && (
+            <div className="bg-gray-50 border-b border-gray-200 p-2 max-h-24 overflow-y-auto">
+              <p className="text-xs font-semibold text-gray-700 mb-1">Últimas capturas:</p>
+              <div className="flex gap-2">
+                {lastCaptures.map((capture, idx) => (
+                  <div key={idx} className="relative flex-shrink-0">
+                    <img src={capture.image} alt={`Captura ${idx}`} className="w-16 h-16 rounded object-cover border border-gray-300" />
+                    <p className="text-xs text-gray-500 text-center mt-1">{capture.timestamp}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Estatísticas */}
+          <div className="p-2 bg-gray-50 border-t">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-gray-700">
+                <strong>{detectionCount}</strong> detectado{detectionCount !== 1 ? 's' : ''}
+              </span>
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="text-primary hover:text-blue-700 transition"
+                title={isExpanded ? 'Minimizar' : 'Expandir'}
+              >
+                {isExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              </button>
             </div>
           </div>
 
           {/* Controls */}
           <button
             onClick={stopCamera}
-            className="w-full p-2 bg-red-500 text-white hover:bg-red-600 flex items-center justify-center gap-1 text-xs font-medium"
+            className="w-full p-2 bg-red-500 text-white hover:bg-red-600 flex items-center justify-center gap-1 text-xs font-medium transition"
           >
             <X size={14} />
-            Parar
+            Parar Monitoramento
           </button>
         </div>
       ) : (

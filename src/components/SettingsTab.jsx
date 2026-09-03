@@ -50,7 +50,7 @@ export default function SettingsTab() {
           'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
-          model: 'claude-opus-4-1',
+          model: 'claude-opus-5',
           max_tokens: 100,
           messages: [
             {
@@ -62,26 +62,37 @@ export default function SettingsTab() {
       })
 
       if (response.ok) {
-        const data = await response.json()
+        await response.json()
         setApiStatus({
           success: true,
-          message: '✅ Conexão OK! API está funcionando corretamente.'
+          message: '✅ Sucesso! API Claude está funcionando corretamente.'
         })
       } else if (response.status === 401) {
         setApiStatus({
           success: false,
           message: '❌ Chave inválida ou expirada. Verifique em console.anthropic.com'
         })
-      } else {
+      } else if (response.status === 429) {
         setApiStatus({
           success: false,
-          message: `❌ Erro ${response.status}: ${response.statusText}`
+          message: '⏳ Limite de requisições atingido. Tente novamente em alguns minutos.'
+        })
+      } else if (response.status === 500) {
+        setApiStatus({
+          success: false,
+          message: '❌ Erro no servidor da Anthropic. Tente novamente em poucos minutos.'
+        })
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        setApiStatus({
+          success: false,
+          message: `❌ Erro ${response.status}: ${errorData.error?.message || response.statusText}`
         })
       }
     } catch (error) {
       setApiStatus({
         success: false,
-        message: `❌ Erro de conexão: ${error.message}`
+        message: `❌ Erro de conexão: ${error.message || 'Verifique sua internet e tente novamente'}`
       })
     } finally {
       setTestingApi(false)

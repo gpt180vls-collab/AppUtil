@@ -160,7 +160,8 @@ export default function DocumentsTab() {
             <button
               onClick={() => fileInputRef.current?.click()}
               className="bg-orange-500 text-white p-4 rounded-lg flex flex-col items-center gap-2 hover:bg-orange-600 transition"
-              disabled={isProcessing}
+              disabled={isLoading}
+              title="Fazer upload de arquivo (PDF, DOCX, TXT, MD)"
             >
               <FileUp size={24} />
               <span className="text-sm">Arquivo</span>
