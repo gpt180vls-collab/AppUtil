@@ -37,20 +37,15 @@ export const claudeService = {
 
   answerQuiz: async (questions, courseContent, apiKey) => {
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'claude-opus-5',
-          max_tokens: 2048,
-          messages: [
-            {
-              role: 'user',
-              content: `Você é um assistente de estudo. Com base no seguinte conteúdo do curso, responda as perguntas do quiz.
+          type: 'content',
+          apiKey,
+          content: `Você é um assistente de estudo. Com base no seguinte conteúdo do curso, responda as perguntas do quiz.
 
 CONTEÚDO DO CURSO:
 ${courseContent}
@@ -70,8 +65,6 @@ Responda em JSON com este formato:
 }
 
 Baseie as respostas APENAS no conteúdo fornecido acima.`
-            }
-          ]
         })
       })
 
