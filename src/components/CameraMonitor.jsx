@@ -71,9 +71,12 @@ export default function CameraMonitor() {
     if (!isActive) return
 
     const handleKeyDown = (event) => {
-      // Pau de selfie Bluetooth simula Volume+ (VolumeUp) ou Enter (keyCode 13)
-      if (event.key === 'VolumeUp' || event.key === '+' || event.keyCode === 13) {
+      console.log('🔑 Tecla pressionada:', event.key, 'KeyCode:', event.keyCode)
+
+      // Pau de selfie Bluetooth simula Volume+ (VolumeUp), Enter, ou Space
+      if (event.key === 'VolumeUp' || event.key === '+' || event.keyCode === 13 || event.keyCode === 32 || event.key === ' ') {
         event.preventDefault()
+        console.log('📷 Capturando frame do pau de selfie...')
         captureFrameFromCamera()
       }
     }
