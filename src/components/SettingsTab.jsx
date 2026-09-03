@@ -42,22 +42,15 @@ export default function SettingsTab() {
     setApiStatus(null)
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'claude-opus-5',
-          max_tokens: 100,
-          messages: [
-            {
-              role: 'user',
-              content: 'Responda com apenas "OK" se está funcionando.'
-            }
-          ]
+          type: 'content',
+          apiKey,
+          content: 'Responda com apenas "OK" se está funcionando.'
         })
       })
 
