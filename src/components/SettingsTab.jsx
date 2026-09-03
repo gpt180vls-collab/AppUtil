@@ -203,7 +203,7 @@ export default function SettingsTab() {
           <h3 className="font-semibold mb-3">ℹ️ Sobre</h3>
           <div className="text-sm text-gray-600 space-y-2">
             <p>
-              <strong>Versão:</strong> <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-mono">{APP_VERSION}</span>
+              <strong>Versão:</strong> <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-mono font-bold">{APP_VERSION}</span>
             </p>
             <p>
               <strong>Plataforma:</strong> Web Progressiva (iOS/Android)
