@@ -1,12 +1,13 @@
 import { useState, useRef } from 'react'
 import { useStore } from '../store'
-import { Plus, Camera, FileUp, Trash2, Loader } from 'lucide-react'
+import { Plus, Camera, FileUp, Trash2, Loader, ChevronDown, ChevronUp } from 'lucide-react'
 import { claudeService } from '../services/claude'
 
 export default function DocumentsTab() {
   const [showForm, setShowForm] = useState(false)
   const [content, setContent] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [expandedDoc, setExpandedDoc] = useState(null)
   const fileInputRef = useRef(null)
   const cameraInputRef = useRef(null)
 
@@ -230,38 +231,63 @@ export default function DocumentsTab() {
         {documents.length === 0 ? (
           <p className="text-gray-500 text-center py-8">Nenhuma instrução ainda</p>
         ) : (
-          documents.map(doc => (
-            <div
-              key={doc.id}
-              className="p-4 border border-gray-200 rounded-lg bg-white hover:shadow-md transition"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h3 className="font-semibold">{doc.title}</h3>
-                  <p className="text-sm text-gray-600 line-clamp-2">{doc.summary}</p>
-                  <div className="mt-2 flex gap-2 flex-wrap">
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      doc.type === 'quiz'
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'bg-blue-100 text-blue-700'
-                    }`}>
-                      {doc.type === 'quiz' ? '📝 Quiz' : '📖 Instrução'}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      Confiança: {(doc.confidence * 100).toFixed(0)}%
-                    </span>
+          documents.map(doc => {
+            const isExpanded = expandedDoc === doc.id
+            return (
+              <div
+                key={doc.id}
+                className="border border-gray-200 rounded-lg bg-white overflow-hidden hover:shadow-md transition"
+              >
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setExpandedDoc(isExpanded ? null : doc.id)}
+                  onKeyDown={(e) => e.key === 'Enter' && setExpandedDoc(isExpanded ? null : doc.id)}
+                  className="w-full p-4 flex items-start justify-between text-left cursor-pointer"
+                >
+                  <div className="flex-1">
+                    <h3 className="font-semibold">{doc.title}</h3>
+                    <p className="text-sm text-gray-600 line-clamp-2">{doc.summary}</p>
+                    <div className="mt-2 flex gap-2 flex-wrap">
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        doc.type === 'quiz'
+                          ? 'bg-orange-100 text-orange-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {doc.type === 'quiz' ? '📝 Quiz' : '📖 Instrução'}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        Confiança: {(doc.confidence * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 ml-2">
+                    {isExpanded ? (
+                      <ChevronUp size={20} className="text-primary flex-shrink-0" />
+                    ) : (
+                      <ChevronDown size={20} className="text-gray-400 flex-shrink-0" />
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        deleteDocument(doc.id)
+                      }}
+                      className="p-2 hover:bg-red-100 rounded-lg text-red-500 transition"
+                      title="Deletar"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </div>
                 </div>
-                <button
-                  onClick={() => deleteDocument(doc.id)}
-                  className="p-2 hover:bg-red-100 rounded-lg text-red-500 transition ml-2"
-                  title="Deletar"
-                >
-                  <Trash2 size={18} />
-                </button>
+
+                {isExpanded && (
+                  <div className="border-t p-4 bg-gray-50">
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{doc.content}</p>
+                  </div>
+                )}
               </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
     </div>
