@@ -66,6 +66,22 @@ export default function CameraMonitor() {
     }
   }, [pendingStream, isActive])
 
+  // Listener para pau de selfie Bluetooth (simula Volume+ ou Enter)
+  useEffect(() => {
+    if (!isActive) return
+
+    const handleKeyDown = (event) => {
+      // Pau de selfie Bluetooth simula Volume+ (VolumeUp) ou Enter (keyCode 13)
+      if (event.key === 'VolumeUp' || event.key === '+' || event.keyCode === 13) {
+        event.preventDefault()
+        captureFrameFromCamera()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isActive, canvasRef, claudeApiKey, addDocument, loadDocuments, selectedProject])
+
   const stopCamera = () => {
     if (videoRef.current?.srcObject) {
       videoRef.current.srcObject.getTracks().forEach(track => track.stop())
@@ -74,6 +90,50 @@ export default function CameraMonitor() {
     setDetectionCount(0)
     setLastCaptures([])
     setLastDetection(null)
+  }
+
+  const captureFrameFromCamera = async () => {
+    if (!videoRef.current || !canvasRef.current || !claudeApiKey || !selectedProject) return
+
+    try {
+      const canvas = canvasRef.current
+      const context = canvas.getContext('2d')
+
+      canvas.width = videoRef.current.videoWidth
+      canvas.height = videoRef.current.videoHeight
+
+      if (!context) return
+
+      context.drawImage(videoRef.current, 0, 0)
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8)
+      const imageBase64 = dataUrl.split(',')[1]
+
+      if (!imageBase64) return
+
+      // Analisar com Claude
+      const analysis = await claudeService.analyzeImage(imageBase64, claudeApiKey)
+
+      if (analysis.text && analysis.text.length > 20) {
+        if (analysis.type === 'quiz') {
+          alert(`📝 PERGUNTA DETECTADA:\n\n${analysis.summary}\n\nIr para Quizzes para responder?`)
+          // Aqui poderíamos navegar para a aba de quizzes
+        } else {
+          // Adicionar como instrução
+          await addDocument({
+            title: analysis.summary?.substring(0, 50) || 'Captura do Pau de Selfie',
+            content: analysis.text,
+            type: analysis.type || 'instruction',
+            summary: analysis.summary,
+            confidence: analysis.confidence || 0.85
+          })
+          await loadDocuments()
+          alert(`✅ Conteúdo capturado e adicionado!\n\n${analysis.summary}`)
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao capturar frame:', error)
+      alert(`Erro: ${error.message}`)
+    }
   }
 
   const captureAndAnalyze = async () => {
