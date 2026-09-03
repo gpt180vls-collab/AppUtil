@@ -283,8 +283,8 @@ export default function CameraMonitor() {
 
           {/* Estatísticas */}
           <div className="p-2 bg-gray-50 border-t">
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-gray-700">
+            <div className="flex justify-between items-center text-xs gap-2">
+              <span className="text-gray-700 flex-1">
                 <strong>{detectionCount}</strong> detectado{detectionCount !== 1 ? 's' : ''}
               </span>
               <button
@@ -293,6 +293,14 @@ export default function CameraMonitor() {
                 title={isExpanded ? 'Minimizar' : 'Expandir'}
               >
                 {isExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              </button>
+              <button
+                onClick={captureFrameFromCamera}
+                disabled={isProcessing}
+                className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:opacity-50"
+                title="Capturar frame (ou Volume no pau de selfie)"
+              >
+                📸 Capturar
               </button>
             </div>
           </div>
